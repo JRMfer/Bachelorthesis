@@ -40,7 +40,7 @@ class Agent(object):
         Prints type, id, value and quantity of agent
         """
 
-        return f"ID: {self.id} \nAgent: {self.name} \nType: {self.type}"
+        return f"ID: {self.id} \nAgent: {self.name} \nType: {self.type} \n Price: {self.price}"
 
     def set_budget(self, valuations):
         """
@@ -92,7 +92,7 @@ class Agent(object):
         """
 
         if period in self.transactions:
-            self.transacitons[period].append(price)
+            self.transactions[period].append(price)
             self.profits[period].append(profit)
             self.time[period].append(time_step)
 
@@ -100,7 +100,7 @@ class Agent(object):
             self.transactions[period] = []
             self.profits[period] = []
             self.time[period] = []
-            self.transacitons[period].append(price)
+            self.transactions[period].append(price)
             self.profits[period].append(profit)
             self.time[period].append(time_step)
 
@@ -124,11 +124,11 @@ class Agent_C(Agent):
         if not best_ask:
             best_ask = 400
 
-        if self.type == "buyer" and best_bid < self.valuations[self.index]:
+        if self.type == "buyer" and best_bid <= self.valuations[self.index]:
             bid = randint(best_bid, self.valuations[self.index])
             self.price = bid
             return bid
-        elif self.type == "seller" and best_ask > self.valuations[self.index]:
+        elif self.type == "seller" and best_ask >= self.valuations[self.index]:
             ask = randint(self.valuations[self.index], best_ask)
             self.price = ask
             return ask
@@ -176,8 +176,21 @@ class Agent_K(Agent):
             self.price = best_ask
             return best_ask
         elif self.type == "seller":
-            self.price == best_bid
+            self.price = best_bid
             return best_bid
+
+    def check_valuation(self, max_bid, min_ask):
+        """
+        Checks if outstanding ask/bid is
+        lower/higher or equal than own redemption/cost
+        """
+
+        if self.type == "buyer":
+            return self.valuations[self.index] >= min_ask
+
+        elif self.type == "seller":
+            return self.valuations[self.index] <= max_bid
+
 
     def check_time(self, time_step, total_time_steps):
         return ((total_time_steps - time_step) / total_time_steps) < self.time_frac
@@ -256,14 +269,13 @@ class Agent_K(Agent):
         elif self.type == "seller" and not best_bid:
             return False
 
-        return (self.check_time(time_step, total_time_steps)
+        return ((self.check_time(time_step, total_time_steps)
                 or self.check_best_trade(best_bid, best_ask, previous_min_trade,
                                             previous_max_trade)
                 or self.check_spread_profit(best_bid, best_ask, previous_min_trade,
                                             previous_max_trade))
+                and self.check_valuation(best_bid, best_ask))
 
 if __name__ == "__main__":
 
     kaplan = Agent_K(1, "buyer", [260, 250], 0.1, 0.1, 0.02)
-    # print(kaplan.active)
-    # print(kaplan.offer_price(50))

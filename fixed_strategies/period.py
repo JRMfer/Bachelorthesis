@@ -25,9 +25,10 @@ class Period(object):
 
         self.agents_in_auction = agents
         self.steps = total_time_steps
-        self.suprlus = {}
+        self.surplus = {}
         self.transactions = {}
         self.time = {}
+        self.quantity = {}
         self.active_agents = []
         self.inactive_agents = []
         self.agents_out_auction = []
@@ -35,6 +36,9 @@ class Period(object):
         self.min_ask = None
         self.max_trade = inf
         self.min_trade = -inf
+
+    def __str__(self):
+        return f"Surplus: {self.surplus} \nTransactions: {self.transactions} \nQuantity: {self.quantity}"
 
 
     def set_activity_traders(self, step):
@@ -117,7 +121,7 @@ class Period(object):
         if agent.type == "buyer":
             possible_sellers = []
 
-            for active_agent in self.active_agents:
+            for active_agent in self.agents_in_auction:
                 if active_agent.price:
                     if active_agent.type == "seller" and agent.price >= active_agent.price:
                         possible_sellers.append(active_agent)
@@ -127,7 +131,7 @@ class Period(object):
         else:
             possible_buyers = []
 
-            for active_agent in self.active_agents:
+            for active_agent in self.agents_in_auction:
                 if active_agent.price:
                     if active_agent.type == "buyer" and agent.price <= active_agent.price:
                         possible_buyers.append(active_agent)
@@ -153,14 +157,16 @@ class Period(object):
 
         if period in self.transactions:
             self.surplus[period] += surplus
-            self.transacitons[period].append(price)
+            self.transactions[period].append(price)
             self.time[period].append(time_step)
+            self.quantity[period] += 1
 
         else:
             self.surplus[period] = surplus
+            self.quantity[period] = 1
             self.transactions[period] = []
             self.time[period] = []
-            self.transacitons[period].append(price)
+            self.transactions[period].append(price)
             self.time[period].append(time_step)
 
     # def update_max_min_trade(self, price):
@@ -215,8 +221,8 @@ class Period(object):
 
         # reset outstanding bids
         self.reset_agents()
-        self.max_bid == None
-        self.min_ask == None
+        self.max_bid = None
+        self.min_ask = None
 
 
     def check_competing_agents(self, buyer, seller, buyer_val):
@@ -231,52 +237,44 @@ class Period(object):
         possible_trades_seller = 0
 
         if buyer.budget <= 0 or buyer.index >= len(buyer_val):
+            self.agents_out_auction.append(buyer)
+            self.agents_in_auction.remove(buyer)
             buyer.active == False
 
         if seller.quantity == 0:
-            # self.agents_out_auction.append(seller)
-            # self.agents_in_auction.remove(seller)
-            seller.active == False
-
-        # ALLE STAPPEN HIERONDER ZIJN MISSHIEN NIET EENS NODIG. BOVENSTAANDE IS
-        # GENOEG.HIERNA GEWOON EEN FUNCTIE CREEEREN DIE CHECKT OF ER UBERHAUPT
-        # NOG TRADES KUNNEN PLAATSVINDEN. DAN DOE JE GEWOON MEET MET ALLE
-        # TRADERS, BEHALVE ALS ZE DUS DOOR HETGENE BOVEN UIT HET SPEL ZIJN
-
-        if buyer.active or seller.active:
-            for agent in self.agents_in_auction:
-
-                # checks if buyer still can make traders with one of the sellers
-                if buyer.active:
-                    if agent.type == "seller" and agent.active:
-                        if (buyer.budget >= agent.valuations[agent.index] and
-                        buyer.valuations[buyer.index] >= agent.valuations[agent.index]):
-                            possible_trades_buyer += 1
-
-                elif seller.active:
-                    if agent.type == "buyer" and agent.active:
-                        if (seller.valuations[seller.index] <= agent.valuations[agent.index]
-                        and seller.valuations[seller.index] <= agent.budget):
-                            possible_trades_seller += 1
-
-            if not possible_trades_buyer:
-                buyer.active == False
-
-            if not possible_traders_seller:
-                seller.active == False'
-
-        if not buyer.active:
-            self.agents_out_auction.append(buyer)
-            self.agents_in_auction.remove(buyer)
-
-        if not seller.active:
             self.agents_out_auction.append(seller)
             self.agents_in_auction.remove(seller)
+            seller.active == False
+
 
     def check_end_period(self):
         """
         Checks is agents still are possible
-        to trade with each other
+        to trade with each other, otherwise period has ended
         """
 
-        pass
+        if not self.agents_in_auction:
+            return True
+
+        possible_trades = False
+
+        for agent in self.agents_in_auction:
+            if agent.type == "buyer":
+                for other_agent in self.agents_in_auction:
+                    if (other_agent.type == "seller" and agent.budget
+                        >= other_agent.valuations[other_agent.index]
+                        and agent.valuations[agent.index] >=
+                        other_agent.valuations[other_agent.index] and not
+                        (agent.name == "Kaplan" and other_agent.name == "Kaplan")):
+                        possible_trades = True
+                        break
+
+            if possible_trades:
+                break
+
+        return not possible_trades
+
+            # else:
+            #     for other_agent in self.agents_in_auction:
+            #         if (other_agent.type == "buyer" and other_agent.budget >= agent.valuations[agent.index] and other_agent.valuations[other_agent.index] >= agent.valuations[agent.index]):
+            #             possible_trades

@@ -27,6 +27,7 @@ class Period(object):
         self.steps = total_time_steps
         self.suprlus = {}
         self.transactions = {}
+        self.time = {}
         self.active_agents = []
         self.inactive_agents = []
         self.agents_out_auction = []
@@ -141,6 +142,47 @@ class Period(object):
 
         return buyer.budget - price >= 0
 
+    def add_info_transaction(self, redemption, cost, price, period, time_step):
+        """
+        Keep track of total suprlus per period and of the transactions per
+        time step in every period.
+        """
+
+        # calculates surplus
+        surplus = redemption - cost
+
+        if period in self.transactions:
+            self.surplus[period] += surplus
+            self.transacitons[period].append(price)
+            self.time[period].append(time_step)
+
+        else:
+            self.surplus[period] = surplus
+            self.transactions[period] = []
+            self.time[period] = []
+            self.transacitons[period].append(price)
+            self.time[period].append(time_step)
+
+    # def update_max_min_trade(self, price):
+    #     """
+    #     Check is current transaction price is higher/lower than the already
+    #     known
+    #     """
+    #
+    #     if price >= self.max_trade or price == inf:
+
+
+    def reset_agents(self):
+        """
+        Reset private outstanding bid or ask of all traders
+        and activity
+        """
+
+        for agent in self.active_agents:
+            agent.price == None
+            # agent.active == False
+
+
 
     def procces_transaction(self, buyer, seller, price, period, time_step):
         """
@@ -149,23 +191,92 @@ class Period(object):
         returns transaction price
         """
 
+        # first update private information (profit, transasction price) of the
+        # two traders.
+        profit_buyer = buyer.valuations[buyer.index] - price
+        buyer.add_info_transaction(period, time_step, price, profit_buyer)
+
+        profit_seller = price - seller.valuations[seller.index]
+        seller.add_info_transaction(period, time_step, price, profit_seller)
+
+        # update information (surplus, transaction price, time step) time step
+        # at the according period
+        self.add_info_transaction(buyer.valuations[buyer.index],
+                                    seller.valuations[seller.index], price,
+                                    period, time_step)
+
+        # adjust quantity, budget and the index of the valuations of both traders
         buyer.quantity += 1
         seller.quantity -= 1
-        self.surplus += buyer.valuations[buyer.index] - seller.valuations[seller.index]
+        buyer.budget -= price
+        seller.budget += price
         buyer.index += 1
         seller.index += 1
 
-        ## VANAF HIER DINGEN VERANDEREN ZIE FUNCTIE ERONDER
-        self.transactions.append(price)
-        buyer.profits.append(buyer.valuations[buyer.index] - price)
-        seller.profits.append(buyer.bid - seller.valuation)
-        buyer.bid = 1
-        seller.bid = 200
-        self.agents = [agent for agent in self.agents if agent not in (buyer, seller)]
+        # reset outstanding bids
+        self.reset_agents()
+        self.max_bid == None
+        self.min_ask == None
 
-    def add_info_transaction(self, price, surplus, period, time_step):
+
+    def check_competing_agents(self, buyer, seller, buyer_val):
         """
-        Keeps track of info of transactions per period
-        (surplus, transaction prices)
+        Checks if buyer/seller can still compete
+        for the remainder of trading period,
+        otherwise "save" in array for agents
+        not competing in trading period
         """
+
+        possible_trades_buyer = 0
+        possible_trades_seller = 0
+
+        if buyer.budget <= 0 or buyer.index >= len(buyer_val):
+            buyer.active == False
+
+        if seller.quantity == 0:
+            # self.agents_out_auction.append(seller)
+            # self.agents_in_auction.remove(seller)
+            seller.active == False
+
+        # ALLE STAPPEN HIERONDER ZIJN MISSHIEN NIET EENS NODIG. BOVENSTAANDE IS
+        # GENOEG.HIERNA GEWOON EEN FUNCTIE CREEEREN DIE CHECKT OF ER UBERHAUPT
+        # NOG TRADES KUNNEN PLAATSVINDEN. DAN DOE JE GEWOON MEET MET ALLE
+        # TRADERS, BEHALVE ALS ZE DUS DOOR HETGENE BOVEN UIT HET SPEL ZIJN
+
+        if buyer.active or seller.active:
+            for agent in self.agents_in_auction:
+
+                # checks if buyer still can make traders with one of the sellers
+                if buyer.active:
+                    if agent.type == "seller" and agent.active:
+                        if (buyer.budget >= agent.valuations[agent.index] and
+                        buyer.valuations[buyer.index] >= agent.valuations[agent.index]):
+                            possible_trades_buyer += 1
+
+                elif seller.active:
+                    if agent.type == "buyer" and agent.active:
+                        if (seller.valuations[seller.index] <= agent.valuations[agent.index]
+                        and seller.valuations[seller.index] <= agent.budget):
+                            possible_trades_seller += 1
+
+            if not possible_trades_buyer:
+                buyer.active == False
+
+            if not possible_traders_seller:
+                seller.active == False'
+
+        if not buyer.active:
+            self.agents_out_auction.append(buyer)
+            self.agents_in_auction.remove(buyer)
+
+        if not seller.active:
+            self.agents_out_auction.append(seller)
+            self.agents_in_auction.remove(seller)
+
+    def check_end_period(self):
+        """
+        Checks is agents still are possible
+        to trade with each other
+        """
+
         pass

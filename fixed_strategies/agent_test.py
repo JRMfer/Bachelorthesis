@@ -29,7 +29,7 @@ class Agent(object):
         self.budget = self.set_budget(valuations)
         self.quantity = self.set_quantity(valuations)
         self.price = None
-        self.active = False
+        self.active = True
         self.index = 0
         self.profits = {}
         self.transactions = {}
@@ -95,7 +95,7 @@ class Agent(object):
             self.transacitons[period].append(price)
             self.profits[period].append(profit)
             self.time[period].append(time_step)
-            
+
         else:
             self.transactions[period] = []
             self.profits[period] = []
@@ -189,6 +189,11 @@ class Agent_K(Agent):
         trade price previous period
         (depends on market side of trader)
         """
+        #
+        # if previous_min_trade == -inf and self.type == "buyer":
+        #     return True
+        # elif previous_max_trade == inf and self.type == "seller":
+        #     return True
 
         if self.type == "buyer" and best_ask:
             return best_ask < previous_min_trade

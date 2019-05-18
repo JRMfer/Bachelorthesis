@@ -54,23 +54,47 @@ def main():
         # for time_step in range(TIME_STEPS):
         for time_step in range(100):
 
+            # checks which traders are willing to shout a bid or ask
             trans_period.set_activity_traders(time_step)
+
+            # random agent to shout bid or ask
             trader = trans_period.shout_offer()
 
+            # checks if transactions is possible
             if trans_period.check_transaction():
+
+                # chooses radomly a traders from the opposite market side to exchange
                 second_trader = trans_period.pick_agents_transactions(trader)
 
+                # checks if traders that shouted is buyer
                 if trader.type == "buyer":
+
+                    # check if buyer has enough budget
                     if trans_period.check_buyer(trader, second_trader.price):
+
+                        # procces transactions between the two traders
                         trans_period.procces_transaction(trader, second_trader,
                             second_trader.price, period, time_step)
+
+                        # check if traders can still participate in auction, otherwise update
+                        trans_period.check_competing_agents(trader, second_trader, REDEMPTIONS)
+
+                # checks if trader that shouted is seller
                 else:
+
+                    # checks if the buyer has enough budget
                     if trans_period.check_buyer(second_trader, second_trader.price):
+
+                        # procces transaction between the two traders
                         trans_period.procces_transaction(second_trader, trader,
                             second_trader.price, period, time_step)
 
-                pass
+                        # check if traders can still participate in auction, otherwise update
+                        trans_period.check_competing_agents(second_trader, trader, REDEMPTIONS)
 
+                pass
+                # AAN HET EINDE VAN EEN PERIODE MOET DE MAX EN MIN TRADE TRACK VARIABLE
+                # OP EEN BEPAALDE MANIER WEER GERESET WORDEN!!!!!!!
             pass
     pass
 

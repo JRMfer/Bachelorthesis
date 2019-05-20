@@ -18,33 +18,41 @@ class Period(object):
     transaction period CDA
     """
 
-    def __init__(self, agents, total_time_steps):
+    def __init__(self, agents, total_time_steps, min_shout, max_shout):
         """
-        Initializes a transaction period
+        Initializes a transaction period with attributes to keep track
+        of agents in/out auction, active/inactive agents, max bid
+        and min ask, max/min trade previous period, the gained surplus and
+        corresponding quantities and all transactions made.
         """
 
         self.agents_in_auction = agents
         self.steps = total_time_steps
-        self.surplus = {}
-        self.quantity = {}
-        self.data = []
+        self.min_shout = min_shout
+        self.max_shout = max_shout
+        self.data_transactions = []
         self.data_surplus = []
         self.active_agents = []
         self.inactive_agents = []
         self.agents_out_auction = []
+        self.period = 0
         self.max_bid = None
         self.min_ask = None
         self.max_trade = inf
         self.min_trade = -inf
 
     def __str__(self):
-        return f"Surplus: {self.surplus} \nTransactions: {self.transactions} \nQuantity: {self.quantity}"
+        """
+        Print current gained surplus and corresponding quantity
+        and all transactions
+        """
 
+        return f"Transactions: {self.transactions} "
 
     def set_activity_traders(self, step):
         """
-        Checks whihc traders are willing to shout bids/asks
-        and seperate these in a seperate list
+        Checks which traders are willing to shout bids/asks (active)
+        and seperate the active agents from the inactive agents
         """
 
         self.active_agents = []
@@ -54,19 +62,24 @@ class Period(object):
 
             if agent.name == "Kaplan":
 
-                if agent.check_activity(step, self.steps, self.max_bid, self.min_ask,
-                                        self.min_trade, self.max_trade):
+                if agent.check_activity(step, self.steps, self.max_bid,
+                                        self.min_ask, self.min_trade,
+                                        self.max_trade):
+
                     self.active_agents.append(agent)
+
                 else:
                     self.inactive_agents.append(agent)
 
             elif agent.name == "ZI-C":
 
                 if agent.check_activity(self.max_bid, self.min_ask):
-                    self.active_agents.append(agent)
-                else:
-                    self.inactive_agents.append(agent)
 
+                    self.active_agents.append(agent)
+
+                else:
+
+                    self.inactive_agents.append(agent)
 
     def shout_offer(self):
         """
@@ -78,25 +91,23 @@ class Period(object):
 
         if agent.name == "ZI-C":
             if agent.type == "buyer":
-                offer = agent.offer_price(self.max_bid, self.min_ask)
+                offer = agent.offer_price(self.max_bid, self.min_ask,
+                                          self.min_shout, self.max_shout)
                 self.max_bid = offer
-                # return offer
 
             elif agent.type == "seller":
-                offer = agent.offer_price(self.max_bid, self.min_ask)
+                offer = agent.offer_price(self.max_bid, self.min_ask,
+                                          self.min_shout, self.max_shout)
                 self.min_ask = offer
-                # return offer
 
         elif agent.name == "Kaplan":
             if agent.type == "buyer":
                 offer = agent.offer_price(self.max_bid, self.min_ask)
                 self.max_bid = offer
-                # return offer
 
             elif agent.type == "seller":
                 offer = agent.offer_price(self.max_bid, self.min_ask)
                 self.min_ask = offer
-                # return offer
 
         return agent
 
@@ -155,29 +166,25 @@ class Period(object):
         data = None
 
         try:
-            data =self.data[period]
+            data = self.data_transactions[period]
+
         except IndexError:
-             data = None
+            data = None
 
         # calculates surplus
         surplus = redemption - cost
 
         if data:
-            self.quantity[period] += 1
-            self.surplus[period] += surplus
             transaction = {"price": price, "time": time_step}
-            self.data[period].append(transaction)
+            self.data_transactions[period].append(transaction)
             self.data_surplus[period][0]["surplus"] += surplus
             self.data_surplus[period][0]["quantity"] += 1
-            pass
+
         else:
-            self.quantity[period] = 1
-            self.surplus[period] = surplus
-            transaction = {"price": price, "time": time_step}
-            self.data.append([transaction])
+            transaction = {"time": time_step, "price": price, }
+            self.data_transactions.append([transaction])
             data_surplus = {"surplus": surplus, "quantity": 1}
             self.data_surplus.append([data_surplus])
-
 
     def reset_agents(self):
         """
@@ -185,34 +192,30 @@ class Period(object):
         and activity
         """
 
-        for agent in self.active_agents:
-            agent.price == None
-            # agent.active == False
-
-
+        for agent in self.agents_in_auction:
+            agent.price = None
 
     def procces_transaction(self, buyer, seller, price, period, time_step):
         """
-        Adjust quantity seller/buyer, index of valuations, surplus
-        budget and keep track individual transaction prices
-        returns transaction price
+        Adjust for seller and buyer quantity, index of valuations, surplus,
+        budget and keep track of prive information (price, profit). Also keep
+        track of information per period.
+        Finally reset outstanding offers in period and made by agents
         """
 
-        # first update private information (profit, transasction price) of the
-        # two traders.
+        # add info transaction for buyer and seller
         profit_buyer = buyer.valuations[buyer.index] - price
         buyer.add_info_transaction(period, time_step, price, profit_buyer)
 
         profit_seller = price - seller.valuations[seller.index]
         seller.add_info_transaction(period, time_step, price, profit_seller)
 
-        # update information (surplus, transaction price, time step) time step
-        # at the according period
+        # add info transactions for curren period
         self.add_info_transaction(buyer.valuations[buyer.index],
-                                    seller.valuations[seller.index], price,
-                                    period, time_step)
+                                  seller.valuations[seller.index], price,
+                                  period, time_step)
 
-        # adjust quantity, budget and the index of the valuations of both traders
+        # adjust quantity, budget, index buyer and seller
         buyer.quantity += 1
         seller.quantity -= 1
         buyer.budget -= price
@@ -220,22 +223,16 @@ class Period(object):
         buyer.index += 1
         seller.index += 1
 
-        # reset outstanding bids
+        # reset
         self.reset_agents()
         self.max_bid = None
         self.min_ask = None
 
-
     def check_competing_agents(self, buyer, seller, buyer_val, costs_val):
         """
-        Checks if buyer/seller can still compete
-        for the remainder of trading period,
-        otherwise "save" in array for agents
-        not competing in trading period
+        Checks if buyer and seller
+        can still participate in auction
         """
-
-        possible_trades_buyer = 0
-        possible_trades_seller = 0
 
         if buyer.budget <= 0 or buyer.index >= (len(buyer_val) - 1):
             self.agents_out_auction.append(buyer)
@@ -247,6 +244,17 @@ class Period(object):
             self.agents_in_auction.remove(seller)
             seller.active == False
 
+    def check_trade_agents(self, buyer, seller):
+        """
+        Checks if the two agents can trade with each other.
+        (no trade can happen between two Kaplan agents)
+        """
+
+        return (seller.type == "seller" and buyer.budget
+                >= seller.valuations[seller.index]
+            and buyer.valuations[buyer.index]
+                >= seller.valuations[seller.index] and not
+                (buyer.name == "Kaplan" and seller.name == "Kaplan"))
 
     def check_end_period(self):
         """
@@ -260,13 +268,13 @@ class Period(object):
         possible_trades = False
 
         for agent in self.agents_in_auction:
+
             if agent.type == "buyer":
+
                 for other_agent in self.agents_in_auction:
-                    if (other_agent.type == "seller" and agent.budget
-                        >= other_agent.valuations[other_agent.index]
-                        and agent.valuations[agent.index] >=
-                        other_agent.valuations[other_agent.index] and not
-                        (agent.name == "Kaplan" and other_agent.name == "Kaplan")):
+
+                    if self.check_trade_agents(agent, other_agent):
+
                         possible_trades = True
                         break
 
@@ -280,10 +288,10 @@ class Period(object):
         Keep track of maximum and minimum
         transaction price of previous period
         """
-        prices = [transaction['price'] for transaction in self.data[period]]
+        prices = [transaction["price"]
+                  for transaction in self.data_transactions[period]]
         self.min_trade = min(prices)
         self.max_trade = max(prices)
-
 
     def reset_agents_new_round(self, redemptions, costs):
         """
@@ -295,13 +303,19 @@ class Period(object):
         self.agents_in_auction += self.agents_out_auction
         self.agents_out_auction = []
 
+        # reset max bid ans min ask as well
+        self.max_bid = None
+        self.min_ask = None
+
         for agent in self.agents_in_auction:
             if agent.type == "buyer":
                 agent.budget = sum(redemptions)
                 agent.quantity = 0
+                agent.price = None
                 agent.index = 0
 
             else:
                 agent.budget = 0
                 agent.quantity = len(costs)
+                agent.price = None
                 agent.index = 0

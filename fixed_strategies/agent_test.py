@@ -40,7 +40,7 @@ class Agent(object):
         Prints type, id, value and quantity of agent
         """
 
-        return f"ID: {self.id} \nAgent: {self.name} \nType: {self.type} \n Price: {self.price}"
+        return f"ID: {self.id} \nAgent: {self.name} \nType: {self.type} \n Valuation: {self.valuations[self.index]}"
 
     def set_budget(self, valuations):
         """
@@ -165,13 +165,6 @@ class Agent_K(Agent):
         it will shout the best ask/bid
         """
 
-        # if best_ask == None:
-        #     best_ask = best_bid + 1
-        #
-        # if best_bid == None:
-        #     best_bid =
-
-
         if self.type == "buyer":
             self.price = best_ask
             return best_ask
@@ -202,11 +195,6 @@ class Agent_K(Agent):
         trade price previous period
         (depends on market side of trader)
         """
-        #
-        # if previous_min_trade == -inf and self.type == "buyer":
-        #     return True
-        # elif previous_max_trade == inf and self.type == "seller":
-        #     return True
 
         if self.type == "buyer" and best_ask:
             return best_ask < previous_min_trade
